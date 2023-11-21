@@ -36,7 +36,7 @@ lora_text_encoder:
 
 data:
   dataset1:
-    batch_size: 4
+    batch_size: 40
     cache_latents: True
 
     source:
