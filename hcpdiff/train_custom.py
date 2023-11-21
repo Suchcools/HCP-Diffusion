@@ -219,7 +219,7 @@ class Trainer:
 
     def build_unet_and_TE(self):  # for easy to use colossalAI
         unet = self.cfgs.model.get('unet', None) or UNet2DConditionModel.from_pretrained(
-            self.cfgs.model.pretrained_model_name_or_path, subfolder="unet", revision=self.cfgs.model.revision
+            self.cfgs.model.pretrained_model_name_or_path, subfolder="unet", revision=self.cfgs.model.revision, in_channels=64, low_cpu_mem_usage=False, ignore_mismatched_sizes=True
         )
 
         if self.cfgs.model.get('text_encoder', None) is not None:
