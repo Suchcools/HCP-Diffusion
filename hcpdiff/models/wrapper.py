@@ -15,7 +15,7 @@ class TEUnetWrapper(nn.Module):
         if hasattr(self.TE, 'input_feeder'):
             for feeder in self.TE.input_feeder:
                 feeder(input_all)
-        encoder_hidden_states = self.TE(prompt_ids, output_hidden_states=True)[0]  # Get the text embedding for conditioning
+        encoder_hidden_states = self.TE(prompt_ids, output_hidden_states=True)[0]  # Get the text embedding for conditioning [40, 77, 768]
 
         input_all['encoder_hidden_states'] = encoder_hidden_states
         if hasattr(self.unet, 'input_feeder'):

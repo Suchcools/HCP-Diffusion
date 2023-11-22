@@ -213,13 +213,29 @@ class Trainer:
                                DDPMScheduler.from_pretrained(self.cfgs.model.pretrained_model_name_or_path, subfolder='scheduler')
 
         self.num_train_timesteps = len(self.noise_scheduler.timesteps)
-        self.vae: AutoencoderKL = self.cfgs.model.get('vae', None) or AutoencoderKL.from_pretrained(
-            self.cfgs.model.pretrained_model_name_or_path, subfolder="vae", revision=self.cfgs.model.revision)
+        
+        
+        # Custom VAE
+        from movqgan.util import instantiate_from_config
+        from movqgan import get_movqgan_model
+        from omegaconf import OmegaConf
+        
+        config = OmegaConf.load(f"./vae/vaegan.yaml")
+        vae = instantiate_from_config(config['model'])# Initialize data loaders
+        ckpt_path = f"./vae/ckpt/step=13499-model.ckpt"
+        checkpoint = torch.load(ckpt_path)
+        vae.load_state_dict(checkpoint['state_dict'])
+                
+        self.vae = vae
+        
+        # self.vae: AutoencoderKL = self.cfgs.model.get('vae', None) or AutoencoderKL.from_pretrained(
+        #     self.cfgs.model.pretrained_model_name_or_path, subfolder="vae", revision=self.cfgs.model.revision)
+        
         self.build_unet_and_TE()
 
     def build_unet_and_TE(self):  # for easy to use colossalAI
         unet = self.cfgs.model.get('unet', None) or UNet2DConditionModel.from_pretrained(
-            self.cfgs.model.pretrained_model_name_or_path, subfolder="unet", revision=self.cfgs.model.revision, in_channels=64, low_cpu_mem_usage=False, ignore_mismatched_sizes=True
+            self.cfgs.model.pretrained_model_name_or_path, subfolder="unet", revision=self.cfgs.model.revision, in_channels=64, out_channels=64, low_cpu_mem_usage=False, ignore_mismatched_sizes=True
         )
 
         if self.cfgs.model.get('text_encoder', None) is not None:
