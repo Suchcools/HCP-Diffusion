@@ -30,7 +30,6 @@ from accelerate.utils import set_seed
 from diffusers import AutoencoderKL, UNet2DConditionModel, DDPMScheduler
 from diffusers.utils.import_utils import is_xformers_available
 from omegaconf import OmegaConf
-
 from hcpdiff.ckpt_manager import CkptManagerPKL, CkptManagerSafe
 from hcpdiff.data import RatioBucket, DataGroup, get_sampler
 from hcpdiff.loggers import LoggerGroup
@@ -42,6 +41,11 @@ from hcpdiff.utils.ema import ModelEMA
 from hcpdiff.utils.net_utils import get_scheduler, auto_tokenizer, auto_text_encoder, load_emb
 from hcpdiff.utils.utils import load_config_with_cli, get_cfg_range, mgcd, format_number
 from hcpdiff.visualizer import Visualizer
+
+from movqgan.util import instantiate_from_config
+from movqgan import get_movqgan_model
+from omegaconf import OmegaConf
+
 
 def checkpoint_fix(function, *args, use_reentrant: bool = False, checkpoint_raw=torch.utils.checkpoint.checkpoint, **kwargs):
     return checkpoint_raw(function, *args, use_reentrant=use_reentrant, **kwargs)
@@ -216,10 +220,6 @@ class Trainer:
         
         
         # Custom VAE
-        from movqgan.util import instantiate_from_config
-        from movqgan import get_movqgan_model
-        from omegaconf import OmegaConf
-        
         config = OmegaConf.load(f"./vae/vaegan.yaml")
         vae = instantiate_from_config(config['model'])# Initialize data loaders
         ckpt_path = f"./vae/ckpt/step=13499-model.ckpt"
@@ -235,7 +235,7 @@ class Trainer:
 
     def build_unet_and_TE(self):  # for easy to use colossalAI
         unet = self.cfgs.model.get('unet', None) or UNet2DConditionModel.from_pretrained(
-            self.cfgs.model.pretrained_model_name_or_path, subfolder="unet", revision=self.cfgs.model.revision, in_channels=64, out_channels=64, low_cpu_mem_usage=False, ignore_mismatched_sizes=True
+            self.cfgs.model.pretrained_model_name_or_path, subfolder="unet", revision=self.cfgs.model.revision
         )
 
         if self.cfgs.model.get('text_encoder', None) is not None:

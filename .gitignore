@@ -1172,6 +1172,10 @@ fabric.properties
 ### Example user template
 
 /output
+/output_base
+/movqgan
 /embs
 /exps
+/data
 /vae
+*.pth
