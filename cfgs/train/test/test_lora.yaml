@@ -34,6 +34,11 @@ lora_text_encoder:
       - 're:.*self_attn$'
       - 're:.*mlp$'
 
+vae: 
+  config: vae/vaegan.yaml
+  checkpoint: /vae/ckpt/step=13499-model.ckpt
+
+
 plugin_unet:
   InputAdapter:
     _target_: hcpdiff.models.adapter.InputAdapterPatch

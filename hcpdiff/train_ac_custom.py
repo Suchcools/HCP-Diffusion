@@ -36,12 +36,15 @@ class TrainerSingleCard(Trainer):
         self.num_train_timesteps = len(self.noise_scheduler.timesteps)
         
         
-        # Custom VAE
-        config = OmegaConf.load(f"./vae/vaegan.yaml")
-        vae = instantiate_from_config(config['model'])# Initialize data loaders
-        ckpt_path = f"./vae/ckpt/step=13499-model.ckpt"
-        checkpoint = torch.load(ckpt_path)
-        vae.load_state_dict(checkpoint['state_dict'])
+        # Load VAE configuration
+        vae_config = OmegaConf.load(self.cfgs.vae.config)
+
+        # Instantiate VAE from configuration
+        vae = instantiate_from_config(vae_config['model'])
+
+        # Load VAE state dict from checkpoint
+        vae_checkpoint = torch.load(self.cfgs.vae.checkpoint)
+        vae.load_state_dict(vae_checkpoint['state_dict'])
                 
         self.vae = vae
         
