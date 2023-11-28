@@ -2,7 +2,7 @@ data:
   dataset1:
     _target_: hcpdiff.data.TextImagePairDataset
     _partial_: True # Not directly instantiate the object here. There are other parameters to be added in the runtime.
-    batch_size: 4
+    batch_size: 200
     cache_latents: True
     att_mask_encode: False
     loss_weight: 1.0

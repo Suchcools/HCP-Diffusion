@@ -52,6 +52,22 @@ merge:
         layers: 'all'
     part: null
 
+  plugin_cfg: cfgs/plugins/plugin_adapter.yaml
+
+  group3:
+    type: 'unet'
+    base_model_alpha: 0.0 
+    part: null
+    lora: null
+    plugin: 
+      InputAdapter: 
+        path: '${.....exp_dir}/ckpts/unet-InputAdapter-${.....model_steps}.safetensors'
+        layers: 'conv_in'
+      OutputAdapter:
+        path: '${.....exp_dir}/ckpts/unet-OutputAdapter-${.....model_steps}.safetensors'
+        layers: 'conv_out'
+
+
 interface:
   - _target_: hcpdiff.vis.DiskInterface
     show_steps: 0

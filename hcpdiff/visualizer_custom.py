@@ -2,6 +2,8 @@ import argparse
 import os
 import random
 from typing import List
+os.environ['http_proxy'] = 'http://127.0.0.1:7890'
+os.environ['https_proxy'] = 'http://127.0.0.1:7890'
 
 import hydra
 import torch
@@ -15,6 +17,7 @@ from hcpdiff.utils.net_utils import to_cpu, to_cuda, auto_tokenizer, auto_text_e
 from hcpdiff.utils.pipe_hook import HookPipe_T2I, HookPipe_I2I, HookPipe_Inpaint
 from hcpdiff.utils.utils import load_config_with_cli, load_config, size_to_int, int_to_size, prepare_seed
 from omegaconf import OmegaConf
+from diffusers import AutoencoderKL, UNet2DConditionModel, DDPMScheduler
 from torch.cuda.amp import autocast
 
 class Visualizer:
@@ -50,23 +53,25 @@ class Visualizer:
         te = auto_text_encoder(pretrained_model).from_pretrained(pretrained_model, subfolder="text_encoder", torch_dtype=self.dtype)
         tokenizer = auto_tokenizer(pretrained_model).from_pretrained(pretrained_model, subfolder="tokenizer", use_fast=False)
         
-                
-        # Custom VAE
-        from movqgan.util import instantiate_from_config
-        from movqgan import get_movqgan_model
-        from omegaconf import OmegaConf
-        
-        config = OmegaConf.load(f"./vae/vaegan.yaml")
-        vae = instantiate_from_config(config['model'])# Initialize data loaders
-        ckpt_path = f"./vae/ckpt/step=13499-model.ckpt"
-        checkpoint = torch.load(ckpt_path)
-        vae.load_state_dict(checkpoint['state_dict'])
+        unet = UNet2DConditionModel.from_pretrained(
+                    'deepghs/animefull-latest', subfolder="unet", low_cpu_mem_usage=False, ignore_mismatched_sizes=True, in_channels=64, out_channels=64
+                )
 
+                
+        # Load VAE configuration
+        vae_config = OmegaConf.load(self.cfgs.vae.config)
+
+        # Instantiate VAE from configuration
+        vae = instantiate_from_config(vae_config['model'])
+
+        # Load VAE state dict from checkpoint
+        vae_checkpoint = torch.load(self.cfgs.vae.checkpoint)
+        vae.load_state_dict(vae_checkpoint['state_dict'])
+                
         pipeline = pipeline.from_pretrained(pretrained_model, safety_checker=None, requires_safety_checker=False,
-                                        text_encoder=te, tokenizer=tokenizer,
+                                        text_encoder=te, tokenizer=tokenizer, unet=unet,
                                         torch_dtype=self.dtype, **self.cfgs.new_components)
         pipeline.vae = vae
-        
         return pipeline
     
     def build_optimize(self):
@@ -135,16 +140,16 @@ class Visualizer:
         def vae_decode_offload(latents, return_dict=True, decode_raw=self.pipe.vae.decode):
             if self.need_inter_imgs:
                 to_cuda(self.pipe.vae)
-                res = decode_raw(latents, return_dict=return_dict)
+                res = decode_raw(latents, latents)
             else:
                 to_cpu(self.pipe.unet)
 
                 if self.offload and self.cfgs.offload.vae_cpu:
                     self.pipe.vae.to(dtype=torch.float32)
-                    res = decode_raw(latents.cpu().to(dtype=torch.float32), return_dict=return_dict)
+                    res = decode_raw(latents.cpu().to(dtype=torch.float32), latents.cpu().to(dtype=torch.float32))
                 else:
                     to_cuda(self.pipe.vae)
-                    res = decode_raw(latents.to(dtype=self.pipe.vae.dtype), return_dict=return_dict)
+                    res = decode_raw(latents.to(dtype=self.pipe.vae.dtype), latents.to(dtype=self.pipe.vae.dtype))
 
                 to_cpu(self.pipe.vae)
                 to_cuda(self.pipe.unet)
@@ -154,7 +159,7 @@ class Visualizer:
 
         def vae_encode_offload(x, return_dict=True, encode_raw=self.pipe.vae.encode):
             to_cuda(self.pipe.vae)
-            res = encode_raw(x, return_dict=return_dict)
+            res = encode_raw(x)
             to_cpu(self.pipe.vae)
             return res
 

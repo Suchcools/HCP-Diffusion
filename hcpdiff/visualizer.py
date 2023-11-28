@@ -3,6 +3,9 @@ import os
 import random
 from typing import List
 
+os.environ['http_proxy'] = 'http://127.0.0.1:7890'
+os.environ['https_proxy'] = 'http://127.0.0.1:7890'
+
 import hydra
 import torch
 from PIL import Image
