@@ -159,7 +159,11 @@ class HookPipe_T2I(StableDiffusionPipeline):
 
         latents = latents.to(dtype=self.vae.dtype)
         if not output_type == "latent":
-            image = self.vae.decode(latents/self.vae.config.scaling_factor, return_dict=False)[0]
+            try:
+                image = self.vae.decode(latents/self.vae.config.scaling_factor, return_dict=False)[0]
+            except:
+                z = latents/self.vae.config.scaling_factor
+                image = self.vae.decode(z,z)[0]
         else:
             image = latents
 

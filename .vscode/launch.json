@@ -8,21 +8,21 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            // "args": [
-            //     "hcpdiff/train_custom.py",
-            //     "--cfg",
-            //     "cfgs/train/test/test_lora.yaml",
-            //     "character_name=surtr_arknights",
-            //     "dataset_dir=./data/surtr_dataset"
-            // ]
             "args": [
-                "hcpdiff/visualizer_custom.py",
+                "hcpdiff/train_custom.py",
                 "--cfg",
-                "cfgs/infer/anime/text2img_anime_lora.yaml",
-                "exp_dir=exps/unetpatch",
-                "model_steps=1000",
-                "prompt=masterpiece, best quality, 1girl, solo, {surtr_arknights-1000:1.2}"
+                "cfgs/train/test/train_vae_adapter.yaml",
+                "character_name=surtr_arknights",
+                "dataset_dir=./data/surtr_dataset"
             ]
+            // "args": [
+            //     "hcpdiff/visualizer_custom.py",
+            //     "--cfg",
+            //     "cfgs/infer/anime/text2img_anime_lora.yaml",
+            //     "exp_dir=exps/unetpatch",
+            //     "model_steps=1000",
+            //     "prompt=masterpiece, best quality, 1girl, solo, {surtr_arknights-1000:1.2}"
+            // ]
 
 
 

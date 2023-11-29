@@ -11,6 +11,7 @@ train:
 
 model:
   pretrained_model_name_or_path: 'Lykon/DreamShaper'
+  vae_channel: 64
   clip_skip: 1
 
 dataset_dir: data/surtr_dataset'
@@ -40,7 +41,7 @@ plugin_unet:
 
 data:
   dataset1:
-    batch_size: 160
+    batch_size: 260
     cache_latents: True
 
     source:

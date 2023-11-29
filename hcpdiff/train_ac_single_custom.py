@@ -1,12 +1,7 @@
-"""
-train_ac.py
-====================
-    :Name:        train with accelerate
-    :Author:      Dong Ziyi
-    :Affiliation: HCP Lab, SYSU
-    :Created:     10/03/2023
-    :Licence:     Apache-2.0
-"""
+import os
+import argparse
+import sys
+from functools import partial
 
 from omegaconf import OmegaConf
 from movqgan import get_movqgan_model
@@ -19,13 +14,10 @@ from hcpdiff.models.compose import SDXLTextEncoder
 from loguru import logger
 from accelerate import Accelerator
 import torch
-from functools import partial
-import sys
-import argparse
-import os
 
 
-class TrainerCustom(Trainer):
+class TrainerSingleCard(Trainer):
+    
     def build_model(self):
         # Load the tokenizer
         if self.cfgs.model.get('tokenizer', None) is not None:
@@ -75,12 +67,37 @@ class TrainerCustom(Trainer):
         wrapper_cls = SDXLTEUnetWrapper if text_encoder_cls == SDXLTextEncoder else TEUnetWrapper
         self.TE_unet = wrapper_cls(unet, text_encoder, train_TE=self.train_TE)
 
+    def init_context(self, cfgs_raw):
+        self.accelerator = Accelerator(
+            gradient_accumulation_steps=self.cfgs.train.gradient_accumulation_steps,
+            mixed_precision=self.cfgs.mixed_precision,
+            step_scheduler_with_optimizer=False,
+        )
+
+        self.local_rank = 0
+        self.world_size = self.accelerator.num_processes
+
+        set_seed(self.cfgs.seed+self.local_rank)
+
+    def update_ema(self):
+        if hasattr(self, 'ema_unet'):
+            self.ema_unet.step(self.unet_raw.named_parameters())
+        if hasattr(self, 'ema_text_encoder'):
+            self.ema_text_encoder.step(self.TE_raw.named_parameters())
+
+    @property
+    def unet_raw(self):
+        return self.TE_unet.unet
+
+    @property
+    def TE_raw(self):
+        return self.TE_unet.TE
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Stable Diffusion Training')
-    parser.add_argument('--cfg', type=str, default=None, required=True)
+    parser.add_argument('--cfg', type=str, default='cfg/train/demo.yaml')
     args, cfg_args = parser.parse_known_args()
 
     conf = load_config_with_cli(args.cfg, args_list=cfg_args)  # skip --cfg
-    trainer = TrainerCustom(conf)
+    trainer = TrainerSingleCard(conf)
     trainer.train()
