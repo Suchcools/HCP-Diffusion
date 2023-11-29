@@ -15,7 +15,7 @@ from torch import nn
 
 import colossalai
 import colossalai.tensor
-from colossalai.context.parallel_mode import ParallelMode
+from colossalai.legacy.context.parallel_mode import ParallelMode
 from colossalai.core import global_context as gpc
 from colossalai.nn.parallel.utils import get_static_torch_model
 from colossalai.utils import get_current_device

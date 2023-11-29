@@ -1,7 +1,7 @@
 # base_state*base_model_alpha + (lora_state[i]*lora_scale[i]*lora_alpha[i]) + (part_state[k]*part_alpha[k])
 
-pretrained_model: ''
-prompt: ''
+pretrained_model: 'Lykon/DreamShaper'
+prompt: 'masterpiece, best quality, highres, game cg, 1girl, solo'
 neg_prompt: 'lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry'
 emb_dir: 'embs/'
 N_repeats: 1

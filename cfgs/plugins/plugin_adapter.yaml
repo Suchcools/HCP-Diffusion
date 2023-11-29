@@ -3,14 +3,14 @@ plugin_unet:
   InputAdapter:
     _target_: hcpdiff.models.adapter.InputAdapterPatch
     _partial_: True
-    lr: 1e-4
+    lr: 2e-6
     vae_channel: 64
     layers:
       - 'conv_in'
   OutputAdapter:
     _target_: hcpdiff.models.adapter.OutputAdapterPatch
     _partial_: True
-    lr: 1e-4
+    lr: 2e-6
     vae_channel: 64
     layers:
       - 'conv_out'

@@ -17,8 +17,12 @@ from hcpdiff.utils.net_utils import to_cpu, to_cuda, auto_tokenizer, auto_text_e
 from hcpdiff.utils.pipe_hook import HookPipe_T2I, HookPipe_I2I, HookPipe_Inpaint
 from hcpdiff.utils.utils import load_config_with_cli, load_config, size_to_int, int_to_size, prepare_seed
 from omegaconf import OmegaConf
+from movqgan import get_movqgan_model
+from movqgan.util import instantiate_from_config
 from diffusers import AutoencoderKL, UNet2DConditionModel, DDPMScheduler
 from torch.cuda.amp import autocast
+
+
 
 class Visualizer:
     dtype_dict = {'fp32':torch.float32, 'amp':torch.float32, 'fp16':torch.float16, 'bf16':torch.bfloat16}
@@ -54,10 +58,9 @@ class Visualizer:
         tokenizer = auto_tokenizer(pretrained_model).from_pretrained(pretrained_model, subfolder="tokenizer", use_fast=False)
         
         unet = UNet2DConditionModel.from_pretrained(
-                    'deepghs/animefull-latest', subfolder="unet", low_cpu_mem_usage=False, ignore_mismatched_sizes=True, in_channels=64, out_channels=64
+                    'Lykon/DreamShaper', subfolder="unet", low_cpu_mem_usage=False, ignore_mismatched_sizes=True, in_channels=64, out_channels=64
                 )
-
-                
+ 
         # Load VAE configuration
         vae_config = OmegaConf.load(self.cfgs.vae.config)
 

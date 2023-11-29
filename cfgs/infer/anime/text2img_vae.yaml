@@ -4,14 +4,14 @@ _base_:
 pretrained_model: 'Lykon/DreamShaper'  # better generic anime model
 
 # safe prompt
-prompt: 'masterpiece, best quality, highres, 1girl, solo'
+prompt: 'masterpiece, best quality, highres, game cg, 1girl, solo, {night}, {starry sky}, beach, beautiful detailed sky, {extremely detailed background:1.2}, mature, {surtr_arknights-${model_steps}:1.2}, red_hair, horns, long_hair, purple_eyes, bangs, looking_at_viewer, bare_shoulders, hair_between_eyes, cleavage, {standing}, looking at viewer, {bikini:1.3}, light smile'
 
 # negative prompt
 neg_prompt: 'lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, white border'
-N_repeats: 1  # if prompt or neg_prompt is too long, increase this number
-clip_skip: 1
+N_repeats: 2  # if prompt or neg_prompt is too long, increase this number
+clip_skip: 0
 
-bs: 2
+bs: 1
 num: 1
 
 # when seed is not set, random seed will be used
@@ -24,37 +24,34 @@ infer_args:
   guidance_scale: 7.5  # scale, when higher, the images will tend to be more similar
   num_inference_steps: 30  # how many steps
 
-exp_dir: 'exps/2023-07-26-01-05-35'  # experiment directory
-model_steps: 1000  # steps of selected model
+exp_dir: 'exps/2023-11-29-12-09-06'  # experiment directory
+model_steps: 2000  # steps of selected model
 emb_dir: '${exp_dir}/ckpts/'
 output_dir: 'output/'
 
-merge:
+vae: 
+  config: vae/vaegan.yaml
+  checkpoint: vae/ckpt/step=13499-model.ckpt
 
-  plugin_cfg:
-    InputAdapter:
-      _target_: hcpdiff.models.adapter.InputAdapterPatch
-      _partial_: True
-      lr: 1e-4
-      vae_channel: 64
-      layers:
-        - 'conv_in'
-    OutputAdapter:
-      _target_: hcpdiff.models.adapter.OutputAdapterPatch
-      _partial_: True
-      lr: 1e-4
-      vae_channel: 64
-      layers:
-        - 'conv_out'
+merge:
+  plugin_cfg: cfgs/plugins/plugin_adapter.yaml
 
   group_in:
     type: 'unet'
+    part: null
+    lora: null
     base_model_alpha: 0 # base model weight to merge with lora or part
     plugin:
       InputAdapter:
         path: '${.....exp_dir}/ckpts/unet-InputAdapter-${.....model_steps}.safetensors'
+        vae_channel: 64
+        layers: 
+          - 'conv_in'
       OutputAdapter:
         path: '${.....exp_dir}/ckpts/unet-OutputAdapter-${.....model_steps}.safetensors'
+        vae_channel: 64
+        layers: 
+          - 'conv_out'
 
 interface:
   - _target_: hcpdiff.vis.DiskInterface

@@ -47,7 +47,7 @@ train:
   scale_lr: True # auto scale lr with total batch size
   scheduler:
     name: 'one_cycle'
-    num_warmup_steps: 200
+    num_warmup_steps: 2000
     num_training_steps: 20000
     scheduler_kwargs: {} # args for scheduler
 

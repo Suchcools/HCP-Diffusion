@@ -6,7 +6,7 @@ _base_:
 train:
   train_steps: 20000
   gradient_accumulation_steps: 1
-  save_step: 2000
+  save_step: 1000
 
 
 model:
@@ -27,14 +27,14 @@ plugin_unet:
   InputAdapter:
     _target_: hcpdiff.models.adapter.InputAdapterPatch
     _partial_: True
-    lr: 1e-4
+    lr: 2e-6
     vae_channel: 64
     layers:
       - 'conv_in'
   OutputAdapter:
     _target_: hcpdiff.models.adapter.OutputAdapterPatch
     _partial_: True
-    lr: 1e-4
+    lr: 2e-6
     vae_channel: 64
     layers:
       - 'conv_out'
@@ -73,7 +73,7 @@ logger:
     out_path: 'train.log'
     log_step: 20
     enable_log_image: true
-    image_log_step: 1000
+    image_log_step: 500
   - _target_: hcpdiff.loggers.TBLogger
     _partial_: True
     out_path: 'tblog/'
