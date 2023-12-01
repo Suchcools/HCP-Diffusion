@@ -20,9 +20,9 @@ num: 1
 
 infer_args:
   width: 512
-  height: 768  # image size
+  height: 512  # image size
   guidance_scale: 7.5  # scale, when higher, the images will tend to be more similar
-  num_inference_steps: 30  # how many steps
+  num_inference_steps: 300  # how many steps
 
 exp_dir: 'exps/2023-11-29-12-09-06'  # experiment directory
 model_steps: 2000  # steps of selected model
@@ -34,6 +34,18 @@ vae:
   checkpoint: vae/ckpt/step=13499-model.ckpt
 
 merge:
+
+  group1:
+    type: 'unet'
+    base_model_alpha: 1.0 # base model weight to merge with lora or part
+    lora:
+      - path: '${.....exp_dir}/ckpts/unet-${.....model_steps}.safetensors'
+        rank: 32
+        layers: 
+          - 're:.*\.attn.?$'
+          - 're:.*\.ff$'
+    part: null
+
   plugin_cfg: cfgs/plugins/plugin_adapter.yaml
 
   group_in:

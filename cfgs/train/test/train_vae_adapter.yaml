@@ -22,6 +22,12 @@ vae:
   config: vae/vaegan.yaml
   checkpoint: vae/ckpt/step=13499-model.ckpt
 
+lora_unet:
+  - lr: 2e-6
+    rank: 32
+    layers:
+      - 're:.*\.attn.?$'
+      - 're:.*\.ff$'
 
 plugin_unet:
   InputAdapter:
