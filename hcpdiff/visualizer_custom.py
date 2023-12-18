@@ -58,7 +58,7 @@ class Visualizer:
         tokenizer = auto_tokenizer(pretrained_model).from_pretrained(pretrained_model, subfolder="tokenizer", use_fast=False)
         
         unet = UNet2DConditionModel.from_pretrained(
-                    'Lykon/DreamShaper', subfolder="unet", low_cpu_mem_usage=False, ignore_mismatched_sizes=True, in_channels=64, out_channels=64
+                    self.cfgs.pretrained_model, subfolder="unet", low_cpu_mem_usage=False, ignore_mismatched_sizes=True, in_channels=64, out_channels=64
                 )
  
         # Load VAE configuration
@@ -143,16 +143,16 @@ class Visualizer:
         def vae_decode_offload(latents, return_dict=True, decode_raw=self.pipe.vae.decode):
             if self.need_inter_imgs:
                 to_cuda(self.pipe.vae)
-                res = decode_raw(latents, latents)
+                res = decode_raw(latents, return_dict=return_dict)
             else:
                 to_cpu(self.pipe.unet)
 
                 if self.offload and self.cfgs.offload.vae_cpu:
                     self.pipe.vae.to(dtype=torch.float32)
-                    res = decode_raw(latents.cpu().to(dtype=torch.float32), latents.cpu().to(dtype=torch.float32))
+                    res = decode_raw(latents.cpu().to(dtype=torch.float32), return_dict=return_dict)
                 else:
                     to_cuda(self.pipe.vae)
-                    res = decode_raw(latents.to(dtype=self.pipe.vae.dtype), latents.to(dtype=self.pipe.vae.dtype))
+                    res = decode_raw(latents.to(dtype=self.pipe.vae.dtype), return_dict=return_dict)
 
                 to_cpu(self.pipe.vae)
                 to_cuda(self.pipe.unet)

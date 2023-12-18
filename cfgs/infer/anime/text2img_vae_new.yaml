@@ -1,0 +1,66 @@
+_base_: 
+  - cfgs/infer/text2img.yaml
+
+pretrained_model: 'stablediffusionapi/chilloutmix'  # better generic anime model
+
+prompt: 'masterpiece, best quality, highres, game cg, 1girl, solo'
+neg_prompt: 'lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry'
+
+N_repeats: 1  # if prompt or neg_prompt is too long, increase this number
+clip_skip: 0
+
+bs: 4
+num: 1
+
+# when seed is not set, random seed will be used
+# seed: 758691538  # seed for safe
+# seed: 465191133  # seed for r18
+
+infer_args:
+  width: 512
+  height: 512  # image size
+  guidance_scale: 7.5  # scale, when higher, the images will tend to be more similar
+  num_inference_steps: 50  # how many steps
+
+exp_dir: 'exps/2023-11-29-12-09-06'  # experiment directory
+model_steps: 2000  # steps of selected model
+emb_dir: '${exp_dir}/ckpts/'
+output_dir: 'output/'
+
+vae: 
+  config: vae/vaegan_ch64.yaml
+  checkpoint: vae/ckpt/ch64_step=29999-model.ckpt
+
+merge:
+
+  group1:
+    type: 'unet'
+    base_model_alpha: 0.0 # 替换基础模型的层
+    part: 
+      - path: '${.....exp_dir}/ckpts/unet-${.....model_steps}.safetensors'
+        alpha: 1.0 # 替换基础的模型层
+        layers: 'all'
+
+  plugin_cfg: cfgs/plugins/plugin_adapter_new.yaml
+
+  group_in:
+    type: 'unet'
+    part: null
+    lora: null
+    base_model_alpha: 0 # base model weight to merge with lora or part
+    plugin:
+      InputAdapter:
+        path: '${.....exp_dir}/ckpts/unet-InputAdapter-${.....model_steps}.safetensors'
+        vae_channel: 64
+        layers: 
+          - 'conv_in'
+      OutputAdapter:
+        path: '${.....exp_dir}/ckpts/unet-OutputAdapter-${.....model_steps}.safetensors'
+        vae_channel: 64
+        layers: 
+          - 'conv_out'
+
+interface:
+  - _target_: hcpdiff.vis.DiskInterface
+    show_steps: 0
+    save_root: '${output_dir}'

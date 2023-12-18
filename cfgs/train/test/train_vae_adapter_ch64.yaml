@@ -8,55 +8,65 @@ train:
   gradient_accumulation_steps: 1
   save_step: 1000
 
+  optimizer:
+    _target_: torch.optim.AdamW
+    _partial_: true
+    betas: [0.95, 0.999]
+    eps: 1e-6
+    weight_decay: 0.001
+  scale_lr: false
+  scheduler:
+      name: 'constant_with_warmup'
+      num_warmup_steps: 50
+      num_training_steps: 20000
 
 model:
   pretrained_model_name_or_path: 'Lykon/DreamShaper'
   vae_channel: 64
   clip_skip: 1
 
-dataset_dir: data/surtr_dataset'
-# if exp_dir is not set, a random time-based directory will be used
-# exp_dir: 'exps/surtr'
+dataset_dir: data/laion_pop'
 
 vae: 
-  config: vae/vaegan.yaml
-  checkpoint: vae/ckpt/step=13499-model.ckpt
+  config: vae/vaegan_ch64.yaml
+  checkpoint: vae/ckpt/ch64_step=29999-model.ckpt
 
-lora_unet:
-  - lr: 2e-6
-    rank: 32
-    layers:
-      - 're:.*\.attn.?$'
-      - 're:.*\.ff$'
-
-lora_text_encoder:
-  - lr: 2e-6
-    rank: 16
-    layers:
-      - 're:.*self_attn$'
-      - 're:.*mlp$'
+unet:
+  - # group1
+    lr: 2e-5 # Learning rates for all layers in this group
+    layers: # Layers to train
+      # Train all layers
+      - ''
 
 plugin_unet:
   InputAdapter:
     _target_: hcpdiff.models.adapter.InputAdapterPatch
     _partial_: True
-    lr: 2e-6
+    lr: 2e-5
     vae_channel: 64
     layers:
       - 'conv_in'
   OutputAdapter:
     _target_: hcpdiff.models.adapter.OutputAdapterPatch
     _partial_: True
-    lr: 2e-6
+    lr: 2e-5
     vae_channel: 64
     layers:
       - 'conv_out'
 
 data:
   dataset1:
-    batch_size: 260
+    batch_size: 200
     cache_latents: True
 
+    # # 定义一个所有数据源通用的图像变换，具体细节参考 torchvision.transforms
+    # image_transforms:
+    #   _target_: torchvision.transforms.Compose # "_target_" for hydra.utils.instantiate
+    #   transforms:
+    #     - _target_: torchvision.transforms.ToTensor
+    #     - _target_: hcpdiff.data.utils.ResizeAndPad
+    #       _args_: [[512,512]]
+    
     source:
       data_source1:
         img_root: ${dataset_dir}

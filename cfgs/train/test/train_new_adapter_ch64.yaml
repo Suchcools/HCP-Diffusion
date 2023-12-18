@@ -6,7 +6,7 @@ _base_:
 train:
   train_steps: 20000
   gradient_accumulation_steps: 1
-  save_step: 1000
+  save_step: 1
 
 
 model:
@@ -19,42 +19,35 @@ dataset_dir: data/surtr_dataset'
 # exp_dir: 'exps/surtr'
 
 vae: 
-  config: vae/vaegan.yaml
-  checkpoint: vae/ckpt/step=13499-model.ckpt
+  config: vae/vaegan_ch64.yaml
+  checkpoint: vae/ckpt/ch64_step=29999-model.ckpt
 
-lora_unet:
-  - lr: 2e-6
-    rank: 32
-    layers:
-      - 're:.*\.attn.?$'
-      - 're:.*\.ff$'
-
-lora_text_encoder:
-  - lr: 2e-6
-    rank: 16
-    layers:
-      - 're:.*self_attn$'
-      - 're:.*mlp$'
+unet:
+  - # group1
+    lr: 5e-5 # Learning rates for all layers in this group
+    layers: # Layers to train
+      # Train all layers
+      - ''
 
 plugin_unet:
   InputAdapter:
-    _target_: hcpdiff.models.adapter.InputAdapterPatch
+    _target_: hcpdiff.models.adapter_silu.InputAdapterPatch
     _partial_: True
-    lr: 2e-6
+    lr: 5e-4
     vae_channel: 64
     layers:
       - 'conv_in'
   OutputAdapter:
-    _target_: hcpdiff.models.adapter.OutputAdapterPatch
+    _target_: hcpdiff.models.adapter_silu.OutputAdapterPatch
     _partial_: True
-    lr: 2e-6
+    lr: 5e-4
     vae_channel: 64
     layers:
       - 'conv_out'
 
 data:
   dataset1:
-    batch_size: 260
+    batch_size: 80
     cache_latents: True
 
     source:
@@ -84,7 +77,7 @@ logger:
   - _target_: hcpdiff.loggers.CLILogger
     _partial_: True
     out_path: 'train.log'
-    log_step: 20
+    log_step: 1
     enable_log_image: true
     image_log_step: 500
   - _target_: hcpdiff.loggers.TBLogger

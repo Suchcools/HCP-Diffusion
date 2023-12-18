@@ -11,7 +11,7 @@ train:
 
 model:
   pretrained_model_name_or_path: 'Lykon/DreamShaper'
-  vae_channel: 64
+  vae_channel: 4
   clip_skip: 1
 
 dataset_dir: data/surtr_dataset'
@@ -19,8 +19,8 @@ dataset_dir: data/surtr_dataset'
 # exp_dir: 'exps/surtr'
 
 vae: 
-  config: vae/vaegan.yaml
-  checkpoint: vae/ckpt/step=13499-model.ckpt
+  config: vae/vaegan_ch4.yaml
+  checkpoint: vae/ckpt/step=19999-model.ckpt
 
 lora_unet:
   - lr: 2e-6
@@ -41,14 +41,14 @@ plugin_unet:
     _target_: hcpdiff.models.adapter.InputAdapterPatch
     _partial_: True
     lr: 2e-6
-    vae_channel: 64
+    vae_channel: 4
     layers:
       - 'conv_in'
   OutputAdapter:
     _target_: hcpdiff.models.adapter.OutputAdapterPatch
     _partial_: True
     lr: 2e-6
-    vae_channel: 64
+    vae_channel: 4
     layers:
       - 'conv_out'
 

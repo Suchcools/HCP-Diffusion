@@ -1,14 +1,14 @@
 _base_: [cfgs/train/tuning_base.yaml]
 plugin_unet:
   InputAdapter:
-    _target_: hcpdiff.models.adapter.InputAdapterPatch
+    _target_: hcpdiff.models.adapter_silu.InputAdapterPatch
     _partial_: True
     lr: 2e-4
     vae_channel: 64
     layers:
       - 'conv_in'
   OutputAdapter:
-    _target_: hcpdiff.models.adapter.OutputAdapterPatch
+    _target_: hcpdiff.models.adapter_silu.OutputAdapterPatch
     _partial_: True
     lr: 2e-4
     vae_channel: 64

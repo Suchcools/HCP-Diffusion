@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 from PIL import Image
+
+from torchvision import transforms
 from torchvision import transforms as T
 from torchvision.transforms import functional as F
 
@@ -78,3 +80,31 @@ class CycleData():
                 self.epoch += 1
 
         return cycle()
+
+# 定义自定义的 transform 函数
+class ResizeAndPad:
+    def __init__(self, target_size):
+        self.target_size = target_size
+
+    def __call__(self, img):
+        # 获取原始图像的宽和高
+        width, height = img.size
+
+        # 计算缩放比例
+        scale = max(width, height) / max(self.target_size)
+
+        # 计算缩放后的新尺寸
+        new_width = int(width / scale)
+        new_height = int(height / scale)
+
+        # 缩放图像
+        img = img.resize((new_width, new_height), Image.LANCZOS)
+
+        # 创建一个白色背景的新图像
+        new_img = Image.new("RGB", self.target_size, (255, 255, 255))
+
+        # 将缩放后的图像粘贴到新图像中央
+        offset = ((self.target_size[0] - new_width) // 2, (self.target_size[1] - new_height) // 2)
+        new_img.paste(img, offset)
+
+        return new_img
