@@ -37,9 +37,10 @@ from hcpdiff.models.compose import ComposeEmbPTHook, ComposeTEEXHook
 from hcpdiff.models.compose import SDXLTextEncoder
 from hcpdiff.utils.cfg_net_tools import make_hcpdiff, make_plugin
 from hcpdiff.utils.ema import ModelEMA
-from hcpdiff.utils.net_utils import get_scheduler, auto_tokenizer, auto_text_encoder, load_emb
+from hcpdiff.utils.net_utils import get_scheduler, auto_tokenizer_cls, auto_text_encoder_cls, load_emb
 from hcpdiff.utils.utils import load_config_with_cli, get_cfg_range, mgcd, format_number
 from hcpdiff.visualizer import Visualizer
+from hcpdiff.diffusion.sampler import EDM_DDPMSampler, BaseSampler, DDPMDiscreteSigmaScheduler
 
 def checkpoint_fix(function, *args, use_reentrant: bool = False, checkpoint_raw=torch.utils.checkpoint.checkpoint, **kwargs):
     return checkpoint_raw(function, *args, use_reentrant=use_reentrant, **kwargs)
@@ -70,21 +71,16 @@ class Trainer:
         loss_weights = [dataset.keywords['loss_weight'] for name, dataset in cfgs.data.items()]
         self.train_loader_group = DataGroup([self.build_data(dataset) for name, dataset in cfgs.data.items()], loss_weights)
 
-        self.TE_unet.freeze_model()
-
         if self.cache_latents:
             self.vae = self.vae.to('cpu')
         self.build_optimizer_scheduler()
-        try:
-            self.criterion = cfgs.train.loss.criterion(noise_scheduler=self.noise_scheduler, device=self.device)
-        except:
-            self.criterion = cfgs.train.loss.criterion()
+        self.criterion = cfgs.train.loss.criterion()
 
         self.cfg_scale = get_cfg_range(cfgs.train.cfg_scale)
         if self.cfg_scale[1] == 1.0:
             self.cfg_context = CFGContext()
         else:  # DreamArtist
-            self.cfg_context = DreamArtistPTContext(self.cfg_scale, self.num_train_timesteps)
+            self.cfg_context = DreamArtistPTContext(self.cfg_scale, self.noise_sampler.num_timesteps)
 
         with torch.no_grad():
             self.build_ema()
@@ -202,17 +198,16 @@ class Trainer:
         if self.cfgs.model.get('tokenizer', None) is not None:
             self.tokenizer = self.cfgs.model.tokenizer
         else:
-            tokenizer_cls = auto_tokenizer(self.cfgs.model.pretrained_model_name_or_path, self.cfgs.model.revision)
+            tokenizer_cls = auto_tokenizer_cls(self.cfgs.model.pretrained_model_name_or_path, self.cfgs.model.revision)
             self.tokenizer = tokenizer_cls.from_pretrained(
                 self.cfgs.model.pretrained_model_name_or_path, subfolder="tokenizer",
                 revision=self.cfgs.model.revision, use_fast=False,
             )
 
         # Load scheduler and models
-        self.noise_scheduler = self.cfgs.model.get('noise_scheduler', None) or \
-                               DDPMScheduler.from_pretrained(self.cfgs.model.pretrained_model_name_or_path, subfolder='scheduler')
+        self.noise_sampler = self.cfgs.model.get('noise_scheduler', None) or EDM_DDPMSampler(DDPMDiscreteSigmaScheduler())
 
-        self.num_train_timesteps = len(self.noise_scheduler.timesteps)
+        #self.num_train_timesteps = len(self.noise_scheduler.timesteps)
         self.vae: AutoencoderKL = self.cfgs.model.get('vae', None) or AutoencoderKL.from_pretrained(
             self.cfgs.model.pretrained_model_name_or_path, subfolder="vae", revision=self.cfgs.model.revision)
         self.build_unet_and_TE()
@@ -227,7 +222,7 @@ class Trainer:
             text_encoder_cls = type(text_encoder)
         else:
             # import correct text encoder class
-            text_encoder_cls = auto_text_encoder(self.cfgs.model.pretrained_model_name_or_path, self.cfgs.model.revision)
+            text_encoder_cls = auto_text_encoder_cls(self.cfgs.model.pretrained_model_name_or_path, self.cfgs.model.revision)
             text_encoder = text_encoder_cls.from_pretrained(
                 self.cfgs.model.pretrained_model_name_or_path, subfolder="text_encoder", revision=self.cfgs.model.revision
             )
@@ -237,10 +232,10 @@ class Trainer:
         self.TE_unet = wrapper_cls(unet, text_encoder, train_TE=self.train_TE)
 
     def build_ema(self):
-        if self.cfgs.model.ema_unet>0:
-            self.ema_unet = ModelEMA(self.TE_unet.unet.named_parameters(), self.cfgs.model.ema_unet)
-        if self.train_TE and self.cfgs.model.ema_text_encoder>0:
-            self.ema_text_encoder = ModelEMA(self.TE_unet.TE.named_parameters(), self.cfgs.model.ema_text_encoder)
+        if self.cfgs.model.ema is not None:
+            self.ema_unet = self.cfgs.model.ema(self.TE_unet.unet)
+            if self.train_TE:
+                self.ema_text_encoder = self.cfgs.model.ema(self.TE_unet.TE)
 
     def build_ckpt_manager(self):
         self.ckpt_manager = self.ckpt_manager_map[self.cfgs.ckpt_type]()
@@ -435,49 +430,42 @@ class Trainer:
             latents = image  # Cached latents
         return latents
 
-    def make_noise(self, latents):
-        # Sample noise that we'll add to the latents
-        noise = torch.randn_like(latents)
-        bsz = latents.shape[0]
-        # Sample a random timestep for each image
-        timesteps = torch.randint(0, self.noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
-        timesteps = timesteps.long()
-
-        # Add noise to the latents according to the noise magnitude at each timestep
-        # (this is the forward diffusion process)
-        return self.noise_scheduler.add_noise(latents, noise, timesteps), noise, timesteps
-
-    def forward(self, latents, prompt_ids, **kwargs):
-        noisy_latents, noise, timesteps = self.make_noise(latents)
+    def forward(self, x_0, prompt_ids, attn_mask=None, position_ids=None, **kwargs):
+        x_t, sigma, timesteps = self.noise_sampler.add_noise_rand_t(x_0)
 
         # CFG context for DreamArtist
-        noisy_latents, timesteps = self.cfg_context.pre(noisy_latents, timesteps)
-        model_pred = self.TE_unet(prompt_ids, noisy_latents, timesteps, **kwargs)
+        # eps = F(x_t*c_in)
+        x_t_in = x_t*self.noise_sampler.c_in(sigma).to(dtype=x_t.dtype)
+        x_t_in, timesteps = self.cfg_context.pre(x_t_in, timesteps)
+        model_pred = self.TE_unet(prompt_ids, x_t_in, timesteps, attn_mask=attn_mask, position_ids=position_ids, **kwargs)
         model_pred = self.cfg_context.post(model_pred)
 
         # Get the target for loss depending on the prediction type
         if self.cfgs.train.loss.type == "eps":
             target = noise
-        elif self.cfgs.train.loss.type == "sample":
-            target = self.noise_scheduler.step(noise, timesteps, noisy_latents)
-            model_pred = self.noise_scheduler.step(model_pred, timesteps, noisy_latents)
+        elif self.cfgs.train.loss.type == "x0":
+            target = x_0
+            # x^_0 = c_skip*x_t + c_out*eps
+            model_pred = self.noise_sampler.get_x0(model_pred, x_t, sigma)
         else:
             raise ValueError(f"Unknown loss type {self.cfgs.train.loss.type}")
-        return model_pred, target, timesteps
+        return model_pred, target, sigma
 
     def train_one_step(self, data_list):
         with self.accelerator.accumulate(self.TE_unet):
             for idx, data in enumerate(data_list):
                 image = data.pop('img').to(self.device, dtype=self.weight_dtype)
-                att_mask = data.pop('mask').to(self.device) if 'mask' in data else None
+                img_mask = data.pop('mask').to(self.device) if 'mask' in data else None
                 prompt_ids = data.pop('prompt').to(self.device)
-                other_datas = {k:v.to(self.device, dtype=self.weight_dtype) for k, v in data.items() if k!='plugin_input'}
+                attn_mask = data.pop('attn_mask').to(self.device) if 'attn_mask' in data else None
+                position_ids = data.pop('position_ids').to(self.device) if 'position_ids' in data else None
+                other_datas = {k:v.to(self.device) for k, v in data.items() if k!='plugin_input'}
                 if 'plugin_input' in data:
                     other_datas['plugin_input'] = {k:v.to(self.device, dtype=self.weight_dtype) for k, v in data['plugin_input'].items()}
 
                 latents = self.get_latents(image, self.train_loader_group.get_dataset(idx))
-                model_pred, target, timesteps = self.forward(latents, prompt_ids, **other_datas)
-                loss = self.get_loss(model_pred, target, timesteps, att_mask)*self.train_loader_group.get_loss_weights(idx)
+                model_pred, target, sigma = self.forward(latents, prompt_ids, attn_mask, position_ids, **other_datas)
+                loss = self.get_loss(model_pred, target, sigma, img_mask)*self.train_loader_group.get_loss_weights(idx)
                 self.accelerator.backward(loss)
 
             if hasattr(self, 'optimizer'):
@@ -498,14 +486,15 @@ class Trainer:
                     self.lr_scheduler_pt.step()
                 self.optimizer_pt.zero_grad(set_to_none=self.cfgs.train.set_grads_to_none)
 
-            self.update_ema()
+            if self.accelerator.sync_gradients:
+                self.update_ema()
         return loss.item()
 
-    def get_loss(self, model_pred, target, timesteps, att_mask):
+    def get_loss(self, model_pred, target, sigma, att_mask):
         if att_mask is None:
             att_mask = 1.0
-        if getattr(self.criterion, 'need_timesteps', False):
-            loss = (self.criterion(model_pred.float(), target.float(), timesteps)*att_mask).mean()
+        if getattr(self.criterion, 'need_sigma', False):
+            loss = (self.criterion(model_pred.float(), target.float(), sigma)*att_mask).mean()
         else:
             loss = (self.criterion(model_pred.float(), target.float())*att_mask).mean()
         if len(self.embedding_hook.emb_train)>0:
@@ -514,9 +503,9 @@ class Trainer:
 
     def update_ema(self):
         if hasattr(self, 'ema_unet'):
-            self.ema_unet.step(self.unet_raw.named_parameters())
+            self.ema_unet.update(self.unet_raw)
         if hasattr(self, 'ema_text_encoder'):
-            self.ema_text_encoder.step(self.TE_raw.named_parameters())
+            self.ema_text_encoder.update(self.TE_raw)
 
     def save_model(self, from_raw=False):
         unet_raw = self.unet_raw
