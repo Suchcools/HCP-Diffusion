@@ -8,24 +8,21 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            // "args": [
-            //     "hcpdiff/train_ac_single_custom.py",
-            //     "--cfg",
-            //     "cfgs/train/test/train_new_adapter_ch64.yaml",
-            //     "character_name=surtr_arknights",
-            //     "dataset_dir=./data/surtr_dataset"
-            // ]
             "args": [
-                "hcpdiff/visualizer_custom.py",
+                "hcpdiff/train_ac_single_custom.py",
                 "--cfg",
-                "cfgs/infer/anime/text2img_vae_new.yaml",
-                "exp_dir=exps/pop_subset_20000",
-                "model_steps=20000",
-                "prompt=masterpiece, best quality, 1girl, solo"
+                "cfgs/train/test/train_new_adapter_ch64.yaml",
+                "character_name=surtr_arknights",
+                "dataset_dir=./data/surtr_dataset"
             ]
-
-
-
+            // "args": [
+            //     "hcpdiff/visualizer_custom.py",
+            //     "--cfg",
+            //     "cfgs/infer/anime/text2img_vae_new.yaml",
+            //     "exp_dir=exps/pop_subset_20000",
+            //     "model_steps=20000",
+            //     "prompt=masterpiece, best quality, 1girl, solo"
+            // ]
         }
     ]
 }

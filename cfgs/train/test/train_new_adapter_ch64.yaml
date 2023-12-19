@@ -4,15 +4,31 @@ _base_:
   - cfgs/train/test/tuning_base.yaml
 
 train:
-  train_steps: 20000
+  train_steps: 100000
   gradient_accumulation_steps: 1
-  save_step: 1
+  save_step: 2000
 
+  loss:
+    criterion: # min SNR loss
+      _target_: hcpdiff.loss.EDMLoss
+      gamma: 0.5
 
 model:
+
   pretrained_model_name_or_path: 'Lykon/DreamShaper'
   vae_channel: 64
   clip_skip: 1
+
+  noise_scheduler:
+    _target_: hcpdiff.diffusion.sampler.EDM_DDPMSampler
+    sigma_scheduler:
+      _target_: hcpdiff.diffusion.sampler.DDPMContinuousSigmaScheduler
+
+  ema:
+    _target_: hcpdiff.utils.ema.ModelEMA
+    _partial_: True
+    decay_max: 0.999
+    power: 0.85
 
 dataset_dir: data/surtr_dataset'
 # if exp_dir is not set, a random time-based directory will be used
@@ -24,7 +40,7 @@ vae:
 
 unet:
   - # group1
-    lr: 5e-5 # Learning rates for all layers in this group
+    lr: 5e-7 # Learning rates for all layers in this group
     layers: # Layers to train
       # Train all layers
       - ''
@@ -33,21 +49,21 @@ plugin_unet:
   InputAdapter:
     _target_: hcpdiff.models.adapter_silu.InputAdapterPatch
     _partial_: True
-    lr: 5e-4
+    lr: 5e-6
     vae_channel: 64
     layers:
       - 'conv_in'
   OutputAdapter:
     _target_: hcpdiff.models.adapter_silu.OutputAdapterPatch
     _partial_: True
-    lr: 5e-4
+    lr: 5e-6
     vae_channel: 64
     layers:
       - 'conv_out'
 
 data:
   dataset1:
-    batch_size: 80
+    batch_size: 180
     cache_latents: True
 
     source:
@@ -77,7 +93,7 @@ logger:
   - _target_: hcpdiff.loggers.CLILogger
     _partial_: True
     out_path: 'train.log'
-    log_step: 1
+    log_step: 20
     enable_log_image: true
     image_log_step: 500
   - _target_: hcpdiff.loggers.TBLogger

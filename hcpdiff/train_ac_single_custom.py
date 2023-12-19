@@ -7,10 +7,11 @@ from omegaconf import OmegaConf
 from movqgan import get_movqgan_model
 from movqgan.util import instantiate_from_config
 from diffusers import AutoencoderKL, UNet2DConditionModel, DDPMScheduler
-from hcpdiff.utils.net_utils import get_scheduler, auto_tokenizer, auto_text_encoder, load_emb
+from hcpdiff.utils.net_utils import get_scheduler, auto_tokenizer_cls, auto_text_encoder_cls, load_emb
 from hcpdiff.train_ac import Trainer, RatioBucket, load_config_with_cli, set_seed, get_sampler
 from hcpdiff.models import CFGContext, DreamArtistPTContext, TEUnetWrapper, SDXLTEUnetWrapper
 from hcpdiff.models.compose import SDXLTextEncoder
+from hcpdiff.diffusion.sampler import EDM_DDPMSampler, BaseSampler, DDPMDiscreteSigmaScheduler
 from loguru import logger
 from accelerate import Accelerator
 import torch
@@ -18,22 +19,29 @@ import torch
 
 class TrainerSingleCard(Trainer):
     
+    def init_context(self, cfgs_raw):
+        self.accelerator = Accelerator(
+            gradient_accumulation_steps=self.cfgs.train.gradient_accumulation_steps,
+            mixed_precision=self.cfgs.mixed_precision,
+            step_scheduler_with_optimizer=False,
+        )
+
+        self.local_rank = 0
+        self.world_size = self.accelerator.num_processes
+
     def build_model(self):
         # Load the tokenizer
         if self.cfgs.model.get('tokenizer', None) is not None:
             self.tokenizer = self.cfgs.model.tokenizer
         else:
-            tokenizer_cls = auto_tokenizer(self.cfgs.model.pretrained_model_name_or_path, self.cfgs.model.revision)
+            tokenizer_cls = auto_tokenizer_cls(self.cfgs.model.pretrained_model_name_or_path, self.cfgs.model.revision)
             self.tokenizer = tokenizer_cls.from_pretrained(
                 self.cfgs.model.pretrained_model_name_or_path, subfolder="tokenizer",
                 revision=self.cfgs.model.revision, use_fast=False,
             )
 
         # Load scheduler and models
-        self.noise_scheduler = self.cfgs.model.get('noise_scheduler', None) or \
-            DDPMScheduler.from_pretrained(self.cfgs.model.pretrained_model_name_or_path, subfolder='scheduler')
-
-        self.num_train_timesteps = len(self.noise_scheduler.timesteps)
+        self.noise_sampler = self.cfgs.model.get('noise_scheduler', None) or EDM_DDPMSampler(DDPMDiscreteSigmaScheduler())
 
         # Load VAE configuration
         vae_config = OmegaConf.load(self.cfgs.vae.config)
@@ -58,7 +66,7 @@ class TrainerSingleCard(Trainer):
             text_encoder_cls = type(text_encoder)
         else:
             # import correct text encoder class
-            text_encoder_cls = auto_text_encoder(self.cfgs.model.pretrained_model_name_or_path, self.cfgs.model.revision)
+            text_encoder_cls = auto_text_encoder_cls(self.cfgs.model.pretrained_model_name_or_path, self.cfgs.model.revision)
             text_encoder = text_encoder_cls.from_pretrained(
                 self.cfgs.model.pretrained_model_name_or_path, subfolder="text_encoder", revision=self.cfgs.model.revision
             )
@@ -66,24 +74,6 @@ class TrainerSingleCard(Trainer):
         # Wrap unet and text_encoder to make DDP happy. Multiple DDP has soooooo many fxxking bugs!
         wrapper_cls = SDXLTEUnetWrapper if text_encoder_cls == SDXLTextEncoder else TEUnetWrapper
         self.TE_unet = wrapper_cls(unet, text_encoder, train_TE=self.train_TE)
-
-    def init_context(self, cfgs_raw):
-        self.accelerator = Accelerator(
-            gradient_accumulation_steps=self.cfgs.train.gradient_accumulation_steps,
-            mixed_precision=self.cfgs.mixed_precision,
-            step_scheduler_with_optimizer=False,
-        )
-
-        self.local_rank = 0
-        self.world_size = self.accelerator.num_processes
-
-        set_seed(self.cfgs.seed+self.local_rank)
-
-    def update_ema(self):
-        if hasattr(self, 'ema_unet'):
-            self.ema_unet.step(self.unet_raw.named_parameters())
-        if hasattr(self, 'ema_text_encoder'):
-            self.ema_text_encoder.step(self.TE_raw.named_parameters())
 
     @property
     def unet_raw(self):
