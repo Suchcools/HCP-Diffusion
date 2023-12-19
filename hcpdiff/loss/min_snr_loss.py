@@ -33,6 +33,12 @@ class KDiffMinSNRLoss(MinSNRLoss):
 class EDMLoss(MinSNRLoss):
 
     def forward(self, input: torch.Tensor, target: torch.Tensor, sigma: torch.Tensor) -> torch.Tensor:
+        
+        # 保存 input、target 和 sigma 到指定路径
+        torch.save(input, '/home/linjw/Innoverse/HCP-Diffusion/test/input_tensor.pt')
+        torch.save(target, '/home/linjw/Innoverse/HCP-Diffusion/test/target_tensor.pt')
+        torch.save(sigma, '/home/linjw/Innoverse/HCP-Diffusion/test/sigma_tensor.pt')
+        
         loss = super(MinSNRLoss, self).forward(input, target)
         snr_weight = ((sigma**2+self.gamma**2)/((sigma*self.gamma)**2)).float()
         return loss*snr_weight.view(-1, 1, 1, 1)

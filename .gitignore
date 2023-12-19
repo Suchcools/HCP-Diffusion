@@ -1178,4 +1178,5 @@ fabric.properties
 /exps
 /data
 /vae
+/test
 *.pth
