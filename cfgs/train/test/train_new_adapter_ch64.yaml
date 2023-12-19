@@ -63,7 +63,7 @@ plugin_unet:
 
 data:
   dataset1:
-    batch_size: 180
+    batch_size: 20
     cache_latents: True
 
     source:
@@ -95,7 +95,7 @@ logger:
     out_path: 'train.log'
     log_step: 20
     enable_log_image: true
-    image_log_step: 500
+    image_log_step: 1
   - _target_: hcpdiff.loggers.TBLogger
     _partial_: True
     out_path: 'tblog/'

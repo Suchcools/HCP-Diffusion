@@ -3,9 +3,9 @@ from torch.nn.modules.loss import _Loss
 import torch
 
 class SSIMLoss(_Loss):
-    def __init__(self, , size_average=None, reduce=None, reduction: str = 'mean', **kwargs):
+    def __init__(self, size_average=None, reduce=None, reduction: str = 'mean', **kwargs):
         super().__init__(size_average=size_average, reduce=reduce, reduction=reduction)
-        self.ssim = SSIM(data_range=1., size_average=False, channel=4)
+        self.ssim = SSIM(data_range=1., size_average=False, channel=64) # channel -> 64
 
     def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         input = (input+1)/2
@@ -13,7 +13,7 @@ class SSIMLoss(_Loss):
         return 1-self.ssim(input, target)
 
 class MS_SSIMLoss(_Loss):
-    def __init__(self, , size_average=None, reduce=None, reduction: str = 'mean', **kwargs):
+    def __init__(self, size_average=None, reduce=None, reduction: str = 'mean', **kwargs):
         super().__init__(size_average=size_average, reduce=reduce, reduction=reduction)
         self.ssim = MS_SSIM(data_range=1., size_average=False, channel=4)
 
