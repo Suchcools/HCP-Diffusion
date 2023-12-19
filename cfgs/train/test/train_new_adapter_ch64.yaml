@@ -63,7 +63,7 @@ plugin_unet:
 
 data:
   dataset1:
-    batch_size: 80
+    batch_size: 20
     cache_latents: True
 
     source:

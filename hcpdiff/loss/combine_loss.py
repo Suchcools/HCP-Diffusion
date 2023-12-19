@@ -3,9 +3,9 @@ from torch import nn
 from hcpdiff.loss import EDMLoss, SSIMLoss, GWLoss  # Replace 'your_module_name' with the actual module name where MinSNRLoss is defined
 
 class CombinedLoss(nn.Module):
-    def __init__(self, edm_weight=1.0, ssim_weight=0.005, gw_weight=0.001, gamma=1.0,**kwargs):
+    def __init__(self, edm_weight=1.0, ssim_weight=0.005, gw_weight=0.002, gamma=1.0,**kwargs):
         super(CombinedLoss, self).__init__()
-
+        self.need_sigma = True
         self.edm_loss = EDMLoss(gamma=gamma, **kwargs)
         
         self.ssim_loss = SSIMLoss( **kwargs)
@@ -28,8 +28,3 @@ class CombinedLoss(nn.Module):
         )
 
         return combined_loss
-
-import torch
-combined_loss = CombinedLoss()
-loss = combined_loss(torch.Tensor(2,64,64,64), torch.Tensor(2,64,64,64), torch.Tensor(2,1,1,1))
-print(loss.shape)
