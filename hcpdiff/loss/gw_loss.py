@@ -53,6 +53,9 @@ class GWLoss(_Loss):
 
         weight_x = self.sobel_x.expand(c, 1, 3, 3)
         weight_y = self.sobel_y.expand(c, 1, 3, 3)
+        
+        weight_x = weight_x.to(input.device)  # Make sure weight_x is on the same device as input
+        weight_y = weight_y.to(input.device)  # Make sure weight_y is on the same device as input
 
         Ix1 = F.conv2d(input, weight_x, stride=1, padding=1, groups=c)
         Ix2 = F.conv2d(target, weight_x, stride=1, padding=1, groups=c)
